@@ -15,143 +15,8 @@ import {
   Calendar,
   Tag,
   Camera,
+  Newspaper,
 } from 'lucide-react'
-
-// This would be replaced with an API call in a real implementation
-const mockContentCards: ContentCard[] = [
-  {
-    id: '1',
-    name: 'Story',
-    description: 'Narrative content that tells a compelling story',
-    icon: 'BookOpen',
-    prompt:
-      'Create a compelling story about {topic} that resonates with {audience}. The story should have a clear beginning, middle, and end, with an emotional hook that captures attention.',
-    isActive: true,
-    category: 'Engagement',
-    variables: ['topic', 'audience'],
-  },
-  {
-    id: '2',
-    name: 'Lead Generation',
-    description: 'Content designed to capture potential customer information',
-    icon: 'Users',
-    prompt:
-      'Create a lead generation post for {product} targeting {audience}. Include a clear call-to-action and highlight the value proposition that would make someone want to sign up or learn more.',
-    isActive: true,
-    category: 'Conversion',
-    variables: ['product', 'audience'],
-  },
-  {
-    id: '3',
-    name: 'Insight',
-    description: 'Share valuable industry insights and analysis',
-    icon: 'Lightbulb',
-    prompt:
-      'Share an insightful analysis about {topic} in the {industry} industry. Include data points, trends, and a unique perspective that positions the brand as a thought leader.',
-    isActive: true,
-    category: 'Educational',
-    variables: ['topic', 'industry'],
-  },
-  {
-    id: '4',
-    name: 'Engagement Question',
-    description: 'Questions that encourage audience interaction',
-    icon: 'MessageSquare',
-    prompt:
-      'Create an engaging question about {topic} that will encourage {audience} to comment and share their thoughts. The question should be open-ended and relevant to current trends.',
-    isActive: true,
-    category: 'Engagement',
-    variables: ['topic', 'audience'],
-  },
-  {
-    id: '5',
-    name: 'Hook',
-    description: 'Attention-grabbing opening to capture interest',
-    icon: 'Anchor',
-    prompt:
-      'Create a powerful hook about {topic} that will immediately grab the attention of {audience}. The hook should be concise, intriguing, and make the reader want to learn more.',
-    isActive: true,
-    category: 'Engagement',
-    variables: ['topic', 'audience'],
-  },
-  {
-    id: '6',
-    name: 'Promotional',
-    description: 'Content that promotes products or services',
-    icon: 'Sparkles',
-    prompt:
-      'Create a promotional post for {product} highlighting its {benefits}. The post should be persuasive without being too salesy.',
-    isActive: true,
-    category: 'Conversion',
-    variables: ['product', 'benefits'],
-  },
-  {
-    id: '7',
-    name: 'Educational',
-    description: 'Informative content that teaches your audience',
-    icon: 'GraduationCap',
-    prompt:
-      'Create an educational post about {topic} that provides valuable information to {audience}. Include key facts, insights, and actionable takeaways.',
-    isActive: true,
-    category: 'Educational',
-    variables: ['topic', 'audience'],
-  },
-  {
-    id: '8',
-    name: 'Announcement',
-    description: 'Share news and updates about your business',
-    icon: 'Bell',
-    prompt:
-      'Create an announcement post about {news} for {audience}. The post should generate excitement and clearly communicate the key details.',
-    isActive: true,
-    category: 'Informational',
-    variables: ['news', 'audience'],
-  },
-  {
-    id: '9',
-    name: 'Testimonial',
-    description: 'Showcase positive feedback from customers',
-    icon: 'Star',
-    prompt:
-      'Create a testimonial post highlighting how {product} helped {customer} achieve {result}. The post should be authentic and focus on the specific benefits experienced.',
-    isActive: true,
-    category: 'Social Proof',
-    variables: ['product', 'customer', 'result'],
-  },
-  {
-    id: '10',
-    name: 'Event',
-    description: 'Promote upcoming events or webinars',
-    icon: 'Calendar',
-    prompt:
-      'Create a post promoting an upcoming {event_type} about {topic}. Include key details like date, time, and what attendees will learn or experience.',
-    isActive: true,
-    category: 'Promotional',
-    variables: ['event_type', 'topic'],
-  },
-  {
-    id: '11',
-    name: 'Special Offer',
-    description: 'Highlight discounts or limited-time offers',
-    icon: 'Tag',
-    prompt:
-      'Create a post announcing a special offer of {discount} for {product}. Emphasize the limited-time nature and the value customers will receive.',
-    isActive: true,
-    category: 'Promotional',
-    variables: ['discount', 'product'],
-  },
-  {
-    id: '12',
-    name: 'Behind the Scenes',
-    description: 'Show your audience how your business works',
-    icon: 'Camera',
-    prompt:
-      'Create a behind-the-scenes post showing {process} at {company}. The post should feel authentic and give followers an exclusive look at your business.',
-    isActive: true,
-    category: 'Engagement',
-    variables: ['process', 'company'],
-  },
-]
 
 // Map icon strings to actual Lucide icon components
 const getIconComponent = (iconName: string) => {
@@ -168,6 +33,7 @@ const getIconComponent = (iconName: string) => {
     Calendar: <Calendar className="h-5 w-5" />,
     Tag: <Tag className="h-5 w-5" />,
     Camera: <Camera className="h-5 w-5" />,
+    Newspaper: <Newspaper className="h-5 w-5" />,
   }
 
   return iconMap[iconName] || <MessageSquare className="h-5 w-5" />
@@ -182,29 +48,63 @@ type ContentCardWithIcon = {
   variables?: string[]
 }
 
-export function useContentCards() {
+type UseContentCardsOptions = {
+  tenantId?: string
+}
+
+export function useContentCards(options?: UseContentCardsOptions) {
+  const { tenantId } = options || {}
   const [contentCards, setContentCards] = useState<ContentCardWithIcon[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // In a real app, this would be an API call
-    const fetchContentCards = () => {
-      // Filter to only active cards and transform to the format expected by the UI
-      const activeCards = mockContentCards
-        .filter((card) => card.isActive)
-        .map((card) => ({
-          id: card.id,
-          label: card.name,
-          description: card.description,
-          icon: getIconComponent(card.icon),
-          prompt: card.prompt,
-          variables: card.variables,
-        }))
+    const fetchContentCards = async () => {
+      setIsLoading(true)
+      setError(null)
 
-      setContentCards(activeCards)
+      try {
+        // Fetch content cards from the API
+        const url = `/api/content-cards${tenantId ? `?tenantId=${tenantId}` : ''}`
+        const response = await fetch(url)
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch content cards: ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        // Ensure contentCards is an array before processing
+        if (!data.contentCards || !Array.isArray(data.contentCards)) {
+          console.error('Invalid content cards data:', data)
+          throw new Error('Content cards data is not in the expected format')
+        }
+
+        // Filter to only active cards and transform to the format expected by the UI
+        const activeCards = data.contentCards
+          .filter((card: ContentCard) => card.isActive)
+          .map((card: ContentCard) => ({
+            id: card.id,
+            label: card.name,
+            description: card.description,
+            icon: getIconComponent(card.icon),
+            prompt: card.prompt,
+            variables: card.variables,
+          }))
+
+        setContentCards(activeCards)
+      } catch (err) {
+        console.error('Error fetching content cards:', err)
+        setError('Failed to load content cards')
+        // Fallback to empty array
+        setContentCards([])
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     fetchContentCards()
-  }, [])
+  }, [tenantId])
 
-  return contentCards
+  return { contentCards, isLoading, error }
 }

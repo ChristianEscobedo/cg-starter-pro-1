@@ -30,6 +30,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { useContentCards } from '@/hooks/use-content-cards'
+import { useWhiteLabel } from '@/components/providers/white-label-provider'
 
 const formSchema = z.object({
   brief: z.string().min(10, 'Brief must be at least 10 characters'),
@@ -43,8 +44,35 @@ const formSchema = z.object({
 })
 
 type PostCreatorFormProps = {
-  onPostGenerated: (post: { content: string; imageUrl?: string; isStory?: boolean }) => void
   generateVariants?: boolean
+  // Removed onPostGenerated prop as we're using global state instead
+}
+
+type TextOverlaySettings = {
+  text: string
+  position:
+    | 'top-left'
+    | 'top-center'
+    | 'top-right'
+    | 'center'
+    | 'bottom-left'
+    | 'bottom-center'
+    | 'bottom-right'
+  fontFamily: string
+  fontSize: string
+  color: string
+  backgroundColor: string
+  padding: string
+  isVisible: boolean
+}
+
+type AnimationStyle = 'none' | 'fade-in' | 'slide-up' | 'pulse' | 'bounce'
+
+type ColorBlockStyle = {
+  enabled: boolean
+  backgroundColor: string
+  textColor: string
+  borderColor?: string
 }
 
 type ImageStyle = {
@@ -54,15 +82,38 @@ type ImageStyle = {
   example: string
 }
 
-export default function PostCreatorForm({
-  onPostGenerated,
-  generateVariants = false,
-}: PostCreatorFormProps) {
+import { usePostState } from '@/hooks/use-post-state'
+
+export default function PostCreatorForm({ generateVariants = false }: PostCreatorFormProps) {
+  const { addPost, selectedImage } = usePostState()
+  const { settings: whiteLabelSettings } = useWhiteLabel()
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null)
   const [variables, setVariables] = useState<Record<string, string>>({})
-  const contentCards = useContentCards()
+  const [imageVariations, setImageVariations] = useState<string[]>([])
+  const [selectedVariation, setSelectedVariation] = useState<number>(0)
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false)
+  const [textOverlay, setTextOverlay] = useState<TextOverlaySettings>({
+    text: '',
+    position: 'center',
+    fontFamily: 'Arial',
+    fontSize: '24px',
+    color: '#ffffff',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: '8px',
+    isVisible: false,
+  })
+  const [animationStyle, setAnimationStyle] = useState<AnimationStyle>('none')
+  const [colorBlockStyle, setColorBlockStyle] = useState<ColorBlockStyle>({
+    enabled: false,
+    backgroundColor: '#f0f2f5',
+    textColor: '#1c1e21',
+    borderColor: '#dddfe2',
+  })
+  const { contentCards, isLoading: isLoadingContentCards } = useContentCards({
+    tenantId: 'tenant-1',
+  }) // In a real app, tenantId would come from auth context
 
   const imageStyles: ImageStyle[] = [
     {
@@ -155,6 +206,31 @@ export default function PostCreatorForm({
       console.error('Error generating prompt:', error)
     } finally {
       setIsGeneratingPrompt(false)
+    }
+  }
+
+  const generateImageVariations = async () => {
+    if (!selectedImage) return
+
+    setIsGeneratingVariations(true)
+
+    try {
+      // In a real implementation, this would call an AI image variation API
+      // For now, we'll simulate with different Unsplash images
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      const variations = [
+        selectedImage, // Original image
+        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80',
+        'https://images.unsplash.com/photo-1682687982501-1e58ab814714?w=800&q=80',
+        'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80',
+      ]
+
+      setImageVariations(variations)
+    } catch (error) {
+      console.error('Error generating image variations:', error)
+    } finally {
+      setIsGeneratingVariations(false)
     }
   }
 
@@ -299,8 +375,8 @@ export default function PostCreatorForm({
             isStory: values.postFormat === 'story',
           }
 
-          // Send to parent component
-          onPostGenerated(generatedPost)
+          // Add post to global state
+          addPost(generatedPost)
         }
       } else {
         // Generate a single post
@@ -368,14 +444,17 @@ export default function PostCreatorForm({
           }
         }
 
-        // Create post object
+        // Create post object with enhanced visual features
         const generatedPost = {
           content,
           imageUrl,
           isStory: values.postFormat === 'story',
+          textOverlay: textOverlay.isVisible ? textOverlay : undefined,
+          animationStyle,
+          colorBlockStyle: colorBlockStyle.enabled ? colorBlockStyle : undefined,
         }
 
-        onPostGenerated(generatedPost)
+        addPost(generatedPost)
       }
 
       // Reset form after successful generation
@@ -612,6 +691,48 @@ export default function PostCreatorForm({
 
         {includeImage && (
           <div className="space-y-6 rounded-lg border p-4">
+            {/* Image Variations Generator */}
+            {selectedImage && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Image Variations</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generateImageVariations}
+                    disabled={isGeneratingVariations}
+                  >
+                    {isGeneratingVariations ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>Generate Variations</>
+                    )}
+                  </Button>
+                </div>
+
+                {imageVariations.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {imageVariations.map((variation, index) => (
+                      <div
+                        key={index}
+                        className={`relative cursor-pointer overflow-hidden rounded-md border-2 ${selectedVariation === index ? 'border-blue-500' : 'border-transparent'}`}
+                        onClick={() => setSelectedVariation(index)}
+                      >
+                        <img
+                          src={variation}
+                          alt={`Variation ${index + 1}`}
+                          className="h-20 w-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <FormField
               control={form.control}
               name="imageModel"
@@ -650,7 +771,13 @@ export default function PostCreatorForm({
                     {imageStyles.map((style) => (
                       <Card
                         key={style.id}
-                        className={`cursor-pointer transition-all hover:border-primary ${selectedStyle === style.id ? 'border-2 border-primary' : ''}`}
+                        className={`cursor-pointer transition-all`}
+                        style={{
+                          borderWidth: selectedStyle === style.id ? '2px' : '1px',
+                          borderColor:
+                            selectedStyle === style.id ? whiteLabelSettings.primaryColor : '',
+                          ':hover': { borderColor: whiteLabelSettings.primaryColor },
+                        }}
                         onClick={() => handleStyleSelect(style.id)}
                       >
                         <CardContent className="p-3">
@@ -732,10 +859,266 @@ export default function PostCreatorForm({
                 />
               </TabsContent>
             </Tabs>
+
+            {/* Text Overlay Options */}
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Text Overlay</h3>
+                <Switch
+                  checked={textOverlay.isVisible}
+                  onCheckedChange={(checked) =>
+                    setTextOverlay({ ...textOverlay, isVisible: checked })
+                  }
+                />
+              </div>
+
+              {textOverlay.isVisible && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="overlay-text">Overlay Text</Label>
+                    <Textarea
+                      id="overlay-text"
+                      placeholder="Enter text to overlay on the image..."
+                      value={textOverlay.text}
+                      onChange={(e) => setTextOverlay({ ...textOverlay, text: e.target.value })}
+                      className="min-h-[60px]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-position">Position</Label>
+                      <Select
+                        value={textOverlay.position}
+                        onValueChange={(value) =>
+                          setTextOverlay({ ...textOverlay, position: value as any })
+                        }
+                      >
+                        <SelectTrigger id="overlay-position">
+                          <SelectValue placeholder="Select position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="top-left">Top Left</SelectItem>
+                          <SelectItem value="top-center">Top Center</SelectItem>
+                          <SelectItem value="top-right">Top Right</SelectItem>
+                          <SelectItem value="center">Center</SelectItem>
+                          <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                          <SelectItem value="bottom-center">Bottom Center</SelectItem>
+                          <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-font">Font Family</Label>
+                      <Select
+                        value={textOverlay.fontFamily}
+                        onValueChange={(value) =>
+                          setTextOverlay({ ...textOverlay, fontFamily: value })
+                        }
+                      >
+                        <SelectTrigger id="overlay-font">
+                          <SelectValue placeholder="Select font" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Arial">Arial</SelectItem>
+                          <SelectItem value="Helvetica">Helvetica</SelectItem>
+                          <SelectItem value="Georgia">Georgia</SelectItem>
+                          <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                          <SelectItem value="Courier New">Courier New</SelectItem>
+                          <SelectItem value="Verdana">Verdana</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-color">Text Color</Label>
+                      <div className="flex">
+                        <Input
+                          id="overlay-color"
+                          type="color"
+                          value={textOverlay.color}
+                          onChange={(e) =>
+                            setTextOverlay({ ...textOverlay, color: e.target.value })
+                          }
+                          className="w-12"
+                        />
+                        <Input
+                          type="text"
+                          value={textOverlay.color}
+                          onChange={(e) =>
+                            setTextOverlay({ ...textOverlay, color: e.target.value })
+                          }
+                          className="ml-2 flex-1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="overlay-bg-color">Background Color</Label>
+                      <div className="flex">
+                        <Input
+                          id="overlay-bg-color"
+                          type="color"
+                          value={textOverlay.backgroundColor
+                            .replace('rgba', 'rgb')
+                            .replace(/,[^,]*\)/, ')')}
+                          onChange={(e) =>
+                            setTextOverlay({ ...textOverlay, backgroundColor: e.target.value })
+                          }
+                          className="w-12"
+                        />
+                        <Input
+                          type="text"
+                          value={textOverlay.backgroundColor}
+                          onChange={(e) =>
+                            setTextOverlay({ ...textOverlay, backgroundColor: e.target.value })
+                          }
+                          className="ml-2 flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Animation Style */}
+            <div className="mt-4 space-y-4">
+              <h3 className="text-sm font-medium">Animation Style</h3>
+              <RadioGroup
+                value={animationStyle}
+                onValueChange={(value) => setAnimationStyle(value as AnimationStyle)}
+                className="grid grid-cols-3 gap-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="none" id="animation-none" />
+                  <Label htmlFor="animation-none">None</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="fade-in" id="animation-fade-in" />
+                  <Label htmlFor="animation-fade-in">Fade In</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="slide-up" id="animation-slide-up" />
+                  <Label htmlFor="animation-slide-up">Slide Up</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="pulse" id="animation-pulse" />
+                  <Label htmlFor="animation-pulse">Pulse</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="bounce" id="animation-bounce" />
+                  <Label htmlFor="animation-bounce">Bounce</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Color Block Style */}
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Color Block Style</h3>
+                <Switch
+                  checked={colorBlockStyle.enabled}
+                  onCheckedChange={(checked) =>
+                    setColorBlockStyle({ ...colorBlockStyle, enabled: checked })
+                  }
+                />
+              </div>
+
+              {colorBlockStyle.enabled && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="block-bg-color">Background</Label>
+                    <div className="flex">
+                      <Input
+                        id="block-bg-color"
+                        type="color"
+                        value={colorBlockStyle.backgroundColor}
+                        onChange={(e) =>
+                          setColorBlockStyle({
+                            ...colorBlockStyle,
+                            backgroundColor: e.target.value,
+                          })
+                        }
+                        className="w-12"
+                      />
+                      <Input
+                        type="text"
+                        value={colorBlockStyle.backgroundColor}
+                        onChange={(e) =>
+                          setColorBlockStyle({
+                            ...colorBlockStyle,
+                            backgroundColor: e.target.value,
+                          })
+                        }
+                        className="ml-2 flex-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="block-text-color">Text Color</Label>
+                    <div className="flex">
+                      <Input
+                        id="block-text-color"
+                        type="color"
+                        value={colorBlockStyle.textColor}
+                        onChange={(e) =>
+                          setColorBlockStyle({ ...colorBlockStyle, textColor: e.target.value })
+                        }
+                        className="w-12"
+                      />
+                      <Input
+                        type="text"
+                        value={colorBlockStyle.textColor}
+                        onChange={(e) =>
+                          setColorBlockStyle({ ...colorBlockStyle, textColor: e.target.value })
+                        }
+                        className="ml-2 flex-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="block-border-color">Border Color</Label>
+                    <div className="flex">
+                      <Input
+                        id="block-border-color"
+                        type="color"
+                        value={colorBlockStyle.borderColor || '#dddfe2'}
+                        onChange={(e) =>
+                          setColorBlockStyle({ ...colorBlockStyle, borderColor: e.target.value })
+                        }
+                        className="w-12"
+                      />
+                      <Input
+                        type="text"
+                        value={colorBlockStyle.borderColor || '#dddfe2'}
+                        onChange={(e) =>
+                          setColorBlockStyle({ ...colorBlockStyle, borderColor: e.target.value })
+                        }
+                        className="ml-2 flex-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={isGenerating}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isGenerating || isLoadingContentCards}
+          style={{
+            backgroundColor: whiteLabelSettings.primaryColor,
+            ':hover': { backgroundColor: whiteLabelSettings.secondaryColor },
+          }}
+        >
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

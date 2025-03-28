@@ -19,6 +19,33 @@ import {
   ChevronRight,
 } from 'lucide-react'
 
+type TextOverlay = {
+  text: string
+  position:
+    | 'top-left'
+    | 'top-center'
+    | 'top-right'
+    | 'center'
+    | 'bottom-left'
+    | 'bottom-center'
+    | 'bottom-right'
+  fontFamily: string
+  fontSize: string
+  color: string
+  backgroundColor?: string
+  padding?: string
+  isVisible: boolean
+}
+
+type AnimationStyle = 'none' | 'fade-in' | 'slide-up' | 'pulse' | 'bounce'
+
+type ColorBlockStyle = {
+  enabled: boolean
+  backgroundColor: string
+  textColor: string
+  borderColor?: string
+}
+
 type FacebookPostPreviewProps = {
   content: string
   imageUrl?: string
@@ -26,6 +53,9 @@ type FacebookPostPreviewProps = {
   variants?: Array<{ id: string; content: string; imageUrl?: string }>
   currentVariantIndex?: number
   onSelectVariant?: (index: number) => void
+  textOverlay?: TextOverlay
+  animationStyle?: AnimationStyle
+  colorBlockStyle?: ColorBlockStyle
 }
 
 export default function FacebookPostPreview({
@@ -35,6 +65,23 @@ export default function FacebookPostPreview({
   variants = [],
   currentVariantIndex = 0,
   onSelectVariant = () => {},
+  textOverlay = {
+    text: '',
+    position: 'center',
+    fontFamily: 'Arial',
+    fontSize: '24px',
+    color: '#ffffff',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: '8px',
+    isVisible: false,
+  },
+  animationStyle = 'none',
+  colorBlockStyle = {
+    enabled: false,
+    backgroundColor: '#f0f2f5',
+    textColor: '#1c1e21',
+    borderColor: '#dddfe2',
+  },
 }: FacebookPostPreviewProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(content)
@@ -45,6 +92,44 @@ export default function FacebookPostPreview({
 
   const handleSave = () => {
     setIsEditing(false)
+  }
+
+  // Helper function to get position classes for text overlay
+  const getPositionClasses = (position: string) => {
+    switch (position) {
+      case 'top-left':
+        return 'top-0 left-0'
+      case 'top-center':
+        return 'top-0 left-1/2 -translate-x-1/2'
+      case 'top-right':
+        return 'top-0 right-0'
+      case 'center':
+        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
+      case 'bottom-left':
+        return 'bottom-0 left-0'
+      case 'bottom-center':
+        return 'bottom-0 left-1/2 -translate-x-1/2'
+      case 'bottom-right':
+        return 'bottom-0 right-0'
+      default:
+        return 'top-0 left-0'
+    }
+  }
+
+  // Helper function to get animation classes
+  const getAnimationClass = (animation: AnimationStyle) => {
+    switch (animation) {
+      case 'fade-in':
+        return 'animate-fade-in'
+      case 'slide-up':
+        return 'animate-slide-up'
+      case 'pulse':
+        return 'animate-pulse'
+      case 'bounce':
+        return 'animate-bounce'
+      default:
+        return ''
+    }
   }
 
   const handlePost = () => {
@@ -62,6 +147,24 @@ export default function FacebookPostPreview({
               <img src={imageUrl} alt="Story background" className="h-full w-full object-cover" />
               {/* Gradient overlay for better text visibility */}
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60"></div>
+
+              {/* Text overlay */}
+              {textOverlay.isVisible && textOverlay.text && (
+                <div className={`absolute ${getPositionClasses(textOverlay.position)} z-20 p-4`}>
+                  <div
+                    style={{
+                      fontFamily: textOverlay.fontFamily,
+                      fontSize: textOverlay.fontSize,
+                      color: textOverlay.color,
+                      backgroundColor: textOverlay.backgroundColor,
+                      padding: textOverlay.padding,
+                    }}
+                    className="rounded-md backdrop-blur-sm"
+                  >
+                    {textOverlay.text}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600"></div>
@@ -200,14 +303,53 @@ export default function FacebookPostPreview({
             className="mb-3 min-h-[100px] border-blue-500 focus-visible:ring-blue-500"
           />
         ) : (
-          <p className="mb-3 whitespace-pre-line text-[15px] leading-[1.3333] text-[#050505]">
-            {editedContent}
-          </p>
+          <>
+            {colorBlockStyle.enabled ? (
+              <div
+                style={{
+                  backgroundColor: colorBlockStyle.backgroundColor,
+                  color: colorBlockStyle.textColor,
+                  borderColor: colorBlockStyle.borderColor,
+                }}
+                className={`mb-3 whitespace-pre-line rounded-md border p-4 ${getAnimationClass(animationStyle)}`}
+              >
+                <p className="text-[15px] leading-[1.3333]">{editedContent}</p>
+              </div>
+            ) : (
+              <p
+                className={`mb-3 whitespace-pre-line text-[15px] leading-[1.3333] text-[#050505] ${getAnimationClass(animationStyle)}`}
+              >
+                {editedContent}
+              </p>
+            )}
+          </>
         )}
 
         {imageUrl && (
-          <div className="mb-1 overflow-hidden rounded-lg border border-gray-200">
-            <img src={imageUrl} alt="Post image" className="h-auto w-full object-cover" />
+          <div className="relative mb-1 overflow-hidden rounded-lg border border-gray-200">
+            <img
+              src={imageUrl}
+              alt="Post image"
+              className={`h-auto w-full object-cover ${getAnimationClass(animationStyle)}`}
+            />
+
+            {/* Text overlay */}
+            {textOverlay.isVisible && textOverlay.text && (
+              <div className={`absolute ${getPositionClasses(textOverlay.position)} z-10 p-4`}>
+                <div
+                  style={{
+                    fontFamily: textOverlay.fontFamily,
+                    fontSize: textOverlay.fontSize,
+                    color: textOverlay.color,
+                    backgroundColor: textOverlay.backgroundColor,
+                    padding: textOverlay.padding,
+                  }}
+                  className="rounded-md backdrop-blur-sm"
+                >
+                  {textOverlay.text}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
